@@ -3,10 +3,12 @@
 
 using NUnit.Framework;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
 using osu.Framework.Input.States;
 using osu.Framework.Testing;
+using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Screens.Play.PlayerSettings;
@@ -38,6 +40,22 @@ namespace osu.Game.Tests.Visual.Gameplay
         }
 
         [Test]
+        public void TestCorrectBehaviourOnFirstLoad()
+        {
+            AddAssert("control shows hitsounds enabled", () => hitsoundsControl.Current.Value);
+
+            AddStep("simulate mouse down", () =>
+            {
+                hitsoundsControl.TriggerEvent(new MouseDownEvent(GetContainingInputManager()?.CurrentState ?? new InputState(), osuTK.Input.MouseButton.Left));
+            });
+            AddStep("change the current value to false", () => hitsoundsControl.Current.Value = false);
+            AddAssert("control shows hitsounds disabled", () => !hitsoundsControl.Current.Value);
+
+            recreateControl();
+            AddAssert("control shows hitsounds disabled after reload", () => !hitsoundsControl.Current.Value);
+        }
+
+        [Test]
         public void TestLocalConfigSyncsWithControl()
         {
             AddStep("disable beatmap hitsounds globally", () => localConfig.SetValue(OsuSetting.BeatmapHitsounds, false));
@@ -57,6 +75,26 @@ namespace osu.Game.Tests.Visual.Gameplay
 
             AddStep("disable beatmap hitsounds globally", () => localConfig.SetValue(OsuSetting.BeatmapHitsounds, false));
             AddAssert("control still shows hitsounds enabled", () => hitsoundsControl.Current.Value);
+        }
+
+        [Resolved]
+        private IBindable<WorkingBeatmap> beatmap { get; set; } = null!;
+
+        [Test]
+        public void TestBeatmapHitsoundValueChangesInBeatmap()
+        {
+            AddStep("disable beatmap hitsounds globally", () => localConfig.SetValue(OsuSetting.BeatmapHitsounds, true));
+            AddAssert("control shows hitsounds enabled", () => hitsoundsControl.Current.Value);
+
+            AddStep("simulate mouse down", () =>
+            {
+                hitsoundsControl.TriggerEvent(new MouseDownEvent(GetContainingInputManager()?.CurrentState ?? new InputState(), osuTK.Input.MouseButton.Left));
+            });
+            AddStep("change the current value", () => hitsoundsControl.Current.Value = false);
+            AddAssert("beatmaps hitsound value is off", () => beatmap.Value.BeatmapInfo.UserSettings.Hitsounds == HitsoundsSetting.HitsoundsOff);
+
+            AddStep("change the current value", () => hitsoundsControl.Current.Value = true);
+            AddAssert("beatmaps hitsound value is on", () => beatmap.Value.BeatmapInfo.UserSettings.Hitsounds == HitsoundsSetting.HitsoundsOn);
         }
 
         private void recreateControl()
